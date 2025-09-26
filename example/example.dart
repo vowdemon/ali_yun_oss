@@ -136,12 +136,203 @@ Future<void> _runBytesUploadExample() async {
   print('--- 示例 1.2 结束 ---\n');
 }
 
-/// 示例 2: 下载文件
-Future<void> _runDownloadExample() async {
-  print('\n--- 运行示例 2: 下载文件 ---');
+/// 示例 1.3: 大文件上传 (PDF)
+Future<void> _runLargeFileUploadExample() async {
+  print('\n--- 运行示例 1.3: 大文件上传 (PDF) ---');
   try {
-    const String ossObjectKey = 'example/test_oss_put.txt'; // 要下载的文件
-    const String downloadPath = 'example/downloaded/example.txt'; // 保存路径
+    const String localFilePath = OssConfig.largeTestFilePath;
+    const String ossObjectKey = OssConfig.largeFileOssKey;
+
+    final File file = File(localFilePath);
+    if (!file.existsSync()) {
+      print('错误: 文件 $localFilePath 不存在');
+      return;
+    }
+
+    // 获取文件大小信息
+    final int fileSize = await file.length();
+    print('准备上传大文件:');
+    print('  本地路径: $localFilePath');
+    print('  OSS路径: $ossObjectKey');
+    print('  文件大小: ${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB');
+
+    // 记录开始时间
+    final DateTime startTime = DateTime.now();
+    print('开始时间: $startTime');
+
+    await oss.putObject(
+      file,
+      ossObjectKey,
+      params: OSSRequestParams(
+        isV1Signature: isV1Signature, // 使用全局签名版本设置
+        onSendProgress: (int count, int total) {
+          // 处理上传进度,用百分比展示
+          if (total > 0) {
+            final double progress = count / total * 100;
+            final double uploadedMB = count / 1024 / 1024;
+            final double totalMB = total / 1024 / 1024;
+            print(
+              '大文件上传进度: ${progress.toStringAsFixed(2)}% (${uploadedMB.toStringAsFixed(2)}MB / ${totalMB.toStringAsFixed(2)}MB)',
+            );
+          } else {
+            print('大文件上传进度: ${(count / 1024 / 1024).toStringAsFixed(2)} MB');
+          }
+        },
+      ),
+    );
+
+    // 记录结束时间并计算耗时
+    final DateTime endTime = DateTime.now();
+    final Duration duration = endTime.difference(startTime);
+
+    print('大文件上传成功!');
+    print('结束时间: $endTime');
+    print('总耗时: ${duration.inSeconds} 秒 (${duration.inMilliseconds} 毫秒)');
+    print(
+      '平均速度: ${(fileSize / 1024 / 1024 / duration.inSeconds).toStringAsFixed(2)} MB/s',
+    );
+  } catch (e) {
+    print('大文件上传失败: $e');
+  }
+  print('--- 示例 1.3 结束 ---\n');
+}
+
+/// 示例 1.4: 使用签名 URI 和签名 Headers 上传 PDF
+Future<void> _runSignedUploadExample() async {
+  print('\n--- 运行示例 1.4: 使用签名 URI 和签名 Headers 上传 PDF ---');
+  try {
+    const String localFilePath = OssConfig.largeTestFilePath;
+
+    final File file = File(localFilePath);
+    if (!file.existsSync()) {
+      print('错误: 文件 $localFilePath 不存在');
+      return;
+    }
+
+    // 提取原始文件名（保留扩展名）
+    const String ossObjectKey = OssConfig.largeFileOssKey;
+
+    // 获取文件大小信息
+    final int fileSize = await file.length();
+    print('准备使用签名方式上传PDF文件:');
+    print('  本地路径: $localFilePath');
+    print('  OSS路径: $ossObjectKey');
+    print('  文件大小: ${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB');
+
+    // 记录开始时间
+    final DateTime startTime = DateTime.now();
+    print('开始时间: $startTime');
+
+    // 步骤1: 使用 buildOssUri 构建 OSS URI
+    print('\n步骤1: 构建 OSS URI...');
+    final Uri ossUri = OSSClient.instance.buildOssUri(
+      fileKey: ossObjectKey,
+      // 可以添加自定义查询参数（如果需要）
+      // queryParameters: {'x-oss-process': 'image/resize,l_100'},
+    );
+    print('构建的 OSS URI: $ossUri');
+
+    // 步骤2: 准备基础 Headers
+    print('\n步骤2: 准备基础 Headers...');
+    final Map<String, dynamic> baseHeaders = <String, dynamic>{
+      'Content-Type': 'application/pdf', // PDF 文件的 MIME 类型
+      'Content-Length': fileSize.toString(), // 文件大小
+    };
+    print('基础 Headers: $baseHeaders');
+
+    // 步骤3: 使用 createSignedHeaders 创建签名 Headers
+    print('\n步骤3: 创建签名 Headers...');
+    final Map<String, dynamic> signedHeaders =
+        OSSClient.instance.createSignedHeaders(
+      method: 'PUT', // 上传使用 PUT 方法
+      fileKey: ossObjectKey,
+      contentLength: fileSize,
+      baseHeaders: baseHeaders,
+      isV1Signature: isV1Signature, // 使用全局签名版本设置
+    );
+    print('签名 Headers 已创建 (包含 $signedHeaders 头部)');
+
+    // 步骤4: 使用 Dio 直接发送 HTTP 请求
+    print('\n步骤4: 发送 HTTP PUT 请求...');
+
+    // 创建文件流用于上传
+    final Stream<List<int>> fileStream = file.openRead();
+
+    // 创建 Dio 实例（使用 OSSClient 内部的 Dio 配置）
+    final Dio dio = Dio();
+
+    // 配置请求选项
+    final Options requestOptions = Options(
+      method: 'PUT',
+      headers: signedHeaders,
+      contentType: 'application/pdf',
+    );
+
+    // 发送请求并监控进度
+    final Response<dynamic> response = await dio.putUri(
+      ossUri,
+      data: fileStream,
+      options: requestOptions,
+      onSendProgress: (int count, int total) {
+        // 处理上传进度,用百分比展示
+        if (total > 0) {
+          final double progress = count / total * 100;
+          final double uploadedMB = count / 1024 / 1024;
+          final double totalMB = total / 1024 / 1024;
+          print(
+            '签名上传进度: ${progress.toStringAsFixed(2)}% (${uploadedMB.toStringAsFixed(2)}MB / ${totalMB.toStringAsFixed(2)}MB)',
+          );
+        } else {
+          print('签名上传进度: ${(count / 1024 / 1024).toStringAsFixed(2)} MB');
+        }
+      },
+    );
+
+    // 记录结束时间并计算耗时
+    final DateTime endTime = DateTime.now();
+    final Duration duration = endTime.difference(startTime);
+
+    print('\n✅ 使用签名方式上传成功!');
+    print('HTTP 状态码: ${response.statusCode}');
+    print('响应头部: ${response.headers}');
+    print('结束时间: $endTime');
+    print('总耗时: ${duration.inSeconds} 秒 (${duration.inMilliseconds} 毫秒)');
+    print(
+      '平均速度: ${(fileSize / 1024 / 1024 / duration.inSeconds).toStringAsFixed(2)} MB/s',
+    );
+
+    print('\n📋 技术说明:');
+    print('  • buildOssUri(): 构建标准的 OSS 访问 URI');
+    print('  • createSignedHeaders(): 生成包含签名的 HTTP 头部');
+    print('  • 直接使用 Dio 进行 HTTP PUT 请求');
+    print('  • 支持实时进度监控和错误处理');
+    print('  • 展示了底层签名机制的使用方式');
+  } catch (e) {
+    print('❌ 签名上传失败: $e');
+    if (e is DioException) {
+      print('DioException 详情:');
+      print('  状态码: ${e.response?.statusCode}');
+      print('  响应数据: ${e.response?.data}');
+      print('  错误类型: ${e.type}');
+    }
+  }
+  print('--- 示例 1.4 结束 ---\n');
+}
+
+/// 示例 2: 下载文件 (大文件)
+Future<void> _runDownloadExample() async {
+  print('\n--- 运行示例 2: 下载文件 (大文件) ---');
+  try {
+    const String ossObjectKey = OssConfig.largeFileOssKey; // 要下载的大文件
+    const String downloadPath = OssConfig.largeFileDownloadPath; // 保存路径
+
+    print('准备下载大文件:');
+    print('  OSS路径: $ossObjectKey');
+    print('  本地保存路径: $downloadPath');
+
+    // 记录开始时间
+    final DateTime startTime = DateTime.now();
+    print('开始时间: $startTime');
 
     final Response<dynamic> response = await oss.getObject(
       ossObjectKey,
@@ -150,9 +341,16 @@ Future<void> _runDownloadExample() async {
         onReceiveProgress: (int count, int total) {
           // 避免除以零
           if (total > 0) {
-            print('下载进度: ${(count / total * 100).toStringAsFixed(2)}%');
+            final double progress = count / total * 100;
+            final double downloadedMB = count / 1024 / 1024;
+            final double totalMB = total / 1024 / 1024;
+            print(
+              '下载进度: ${progress.toStringAsFixed(2)}% (${downloadedMB.toStringAsFixed(2)}MB / ${totalMB.toStringAsFixed(2)}MB)',
+            );
           } else {
-            print('下载进度: $count bytes (总大小未知)');
+            print(
+              '下载进度: ${(count / 1024 / 1024).toStringAsFixed(2)} MB (总大小未知)',
+            );
           }
         },
       ),
@@ -163,11 +361,141 @@ Future<void> _runDownloadExample() async {
     await downloadFile.parent.create(recursive: true);
     await downloadFile.writeAsBytes(response.data);
 
-    print('文件下载成功,保存路径: $downloadPath');
+    // 记录结束时间并计算耗时
+    final DateTime endTime = DateTime.now();
+    final Duration duration = endTime.difference(startTime);
+    final int fileSize = await downloadFile.length();
+
+    print('大文件下载成功!');
+    print('保存路径: $downloadPath');
+    print('文件大小: ${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB');
+    print('结束时间: $endTime');
+    print('总耗时: ${duration.inSeconds} 秒 (${duration.inMilliseconds} 毫秒)');
+    print(
+      '平均速度: ${(fileSize / 1024 / 1024 / duration.inSeconds).toStringAsFixed(2)} MB/s',
+    );
   } catch (e) {
     print('文件下载失败: $e');
   }
   print('--- 示例 2 结束 ---\n');
+}
+
+/// 示例 2.1: 使用签名 URI 和签名 Headers 下载文件
+Future<void> _runSignedDownloadExample() async {
+  print('\n--- 运行示例 2.1: 使用签名 URI 和签名 Headers 下载文件 ---');
+  try {
+    const String ossObjectKey = OssConfig.largeFileOssKey; // 要下载的大文件
+    const String downloadPath = OssConfig.largeFileDownloadPath; // 保存路径
+
+    print('准备使用签名方式下载PDF文件:');
+    print('  OSS路径: $ossObjectKey');
+    print('  本地保存路径: $downloadPath');
+
+    // 记录开始时间
+    final DateTime startTime = DateTime.now();
+    print('开始时间: $startTime');
+
+    // 步骤1: 使用 buildOssUri 构建 OSS URI
+    print('\n步骤1: 构建 OSS URI...');
+    final Uri ossUri = OSSClient.instance.buildOssUri(
+      fileKey: ossObjectKey,
+      // 可以添加自定义查询参数（如果需要）
+      // queryParameters: {'x-oss-process': 'image/resize,l_100'},
+    );
+    print('构建的 OSS URI: $ossUri');
+
+    // 步骤2: 准备基础 Headers
+    print('\n步骤2: 准备基础 Headers...');
+    final Map<String, dynamic> baseHeaders = <String, dynamic>{
+      'Accept': 'application/octet-stream', // 接受二进制数据
+      'Cache-Control': 'no-cache', // 禁用缓存
+    };
+    print('基础 Headers: $baseHeaders');
+
+    // 步骤3: 使用 createSignedHeaders 创建签名 Headers
+    print('\n步骤3: 创建签名 Headers...');
+    final Map<String, dynamic> signedHeaders =
+        OSSClient.instance.createSignedHeaders(
+      method: 'GET', // 下载使用 GET 方法
+      fileKey: ossObjectKey,
+      baseHeaders: baseHeaders,
+      isV1Signature: isV1Signature, // 使用全局签名版本设置
+    );
+    print('签名 Headers 已创建 (包含 $signedHeaders 头部)');
+
+    // 步骤4: 使用 Dio 直接发送 HTTP 请求
+    print('\n步骤4: 发送 HTTP GET 请求...');
+
+    // 创建 Dio 实例
+    final Dio dio = Dio();
+
+    // 配置请求选项
+    final Options requestOptions = Options(
+      method: 'GET',
+      headers: signedHeaders,
+      responseType: ResponseType.bytes, // 接收字节数据
+    );
+
+    // 发送请求并监控进度
+    final Response<List<int>> response = await dio.getUri<List<int>>(
+      ossUri,
+      options: requestOptions,
+      onReceiveProgress: (int count, int total) {
+        // 处理下载进度,用百分比展示
+        // if (total > 0) {
+        //   final double progress = count / total * 100;
+        //   final double downloadedMB = count / 1024 / 1024;
+        //   final double totalMB = total / 1024 / 1024;
+        //   print(
+        //     '签名下载进度: ${progress.toStringAsFixed(2)}% (${downloadedMB.toStringAsFixed(2)}MB / ${totalMB.toStringAsFixed(2)}MB)',
+        //   );
+        // } else {
+        //   print(
+        //     '签名下载进度: ${(count / 1024 / 1024).toStringAsFixed(2)} MB (总大小未知)',
+        //   );
+        // }
+      },
+    );
+
+    // 步骤5: 保存下载的文件
+    print('\n步骤5: 保存下载的文件...');
+    final File downloadFile = File(downloadPath);
+    // 确保目录存在
+    await downloadFile.parent.create(recursive: true);
+    await downloadFile.writeAsBytes(response.data!);
+
+    // 记录结束时间并计算耗时
+    final DateTime endTime = DateTime.now();
+    final Duration duration = endTime.difference(startTime);
+    final int fileSize = await downloadFile.length();
+
+    print('\n✅ 使用签名方式下载成功!');
+    print('HTTP 状态码: ${response.statusCode}');
+    print('响应头部: ${response.headers}');
+    print('保存路径: $downloadPath');
+    print('文件大小: ${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB');
+    print('结束时间: $endTime');
+    print('总耗时: ${duration.inSeconds} 秒 (${duration.inMilliseconds} 毫秒)');
+    print(
+      '平均速度: ${(fileSize / 1024 / 1024 / duration.inSeconds).toStringAsFixed(2)} MB/s',
+    );
+
+    print('\n📋 技术说明:');
+    print('  • buildOssUri(): 构建标准的 OSS 访问 URI');
+    print('  • createSignedHeaders(): 生成包含签名的 HTTP 头部');
+    print('  • 直接使用 Dio 进行 HTTP GET 请求');
+    print('  • 支持实时进度监控和错误处理');
+    print('  • 展示了底层签名机制的下载使用方式');
+  } catch (e) {
+    print('❌ 签名下载失败: $e');
+    if (e is DioException) {
+      print('DioException 详情:');
+      print('  状态码: ${e.response?.statusCode}');
+      print('  响应数据: ${e.response?.data}');
+      print('  错误类型: ${e.type}');
+    }
+  }
+  print('--- 示例 2.1 结束 ---\n');
 }
 
 /// 示例 3: 分片上传文件 (使用封装后的方法)
@@ -682,7 +1010,10 @@ Future<void> main() async {
     print('  1: 文件上传 (File)');
     print('  1.1: 字符串上传 (String)');
     print('  1.2: 字节数组上传 (Uint8List)');
-    print('  2: 下载文件');
+    print('  1.3: 大文件上传 (PDF)');
+    print('  1.4: 使用签名 URI 和签名 Headers 上传 PDF');
+    print('  2: 下载文件 (大文件)');
+    print('  2.1: 使用签名 URI 和签名 Headers 下载文件');
     print('  3: 分片上传 (使用封装方法)');
     print('  4: 列出已上传的分片 (需手动输入)');
     print('  5: 列出所有进行中的分片上传');
@@ -712,8 +1043,17 @@ Future<void> main() async {
       case '1.2':
         await _runBytesUploadExample();
         break;
+      case '1.3':
+        await _runLargeFileUploadExample();
+        break;
+      case '1.4':
+        await _runSignedUploadExample();
+        break;
       case '2':
         await _runDownloadExample();
+        break;
+      case '2.1':
+        await _runSignedDownloadExample();
         break;
       case '3':
         await _runMultipartUploadExample();
@@ -769,7 +1109,7 @@ Future<void> _runCnameDemo() async {
     // 运行CNAME演示脚本
     final ProcessResult result = await Process.run(
       'dart',
-      ['run', 'example/cname_demo.dart'],
+      <String>['run', 'example/cname_demo.dart'],
       workingDirectory: Directory.current.path,
     );
 
