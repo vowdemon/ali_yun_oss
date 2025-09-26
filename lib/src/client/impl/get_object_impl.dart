@@ -171,7 +171,7 @@ mixin GetObjectImpl on IOSSService {
           lastModified: response.headers.value('Last-Modified')!,
           versionId: response.headers.value('x-oss-version-id'),
         );
-      } catch (err, stack) {
+      } catch (err) {
         return null;
       }
     });

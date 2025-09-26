@@ -2,6 +2,22 @@
 
 [English](CHANGELOG.md) | [中文](CHANGELOG_zh.md)
 
+## 1.2.1
+
+### ✨ Enhancements
+- Add: object deletion implementation (`deleteObject`).
+- Add: Objects Listing V2 (`listObjectsV2`) with pagination, prefix and delimiter; introduce result model `ListBucketResultV2`.
+- Add: Object metadata model `ObjectMeta` for richer object info parsing.
+- Add: `Service` interface and error type extensions for unified service APIs and error semantics.
+- Improve: `getObject` implementation robustness.
+- Docs/Example: update `example/example.dart` to showcase new capabilities.
+
+### 🔄 Compatibility
+- Backward compatible: additive changes only, no breaking changes.
+
+### 📚 Docs
+- Update CHANGELOG for 1.2.1.
+
 ## 1.2.0
 
 ### ✨ Major New Features

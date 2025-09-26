@@ -2,6 +2,22 @@
 
 [English](CHANGELOG.md) | [中文](CHANGELOG_zh.md)
 
+## 1.2.1
+
+### ✨ 功能增强
+- 新增：删除对象 API 实现（`deleteObject`）。
+- 新增：对象列举 V2（`listObjectsV2`），支持分页、前缀、分隔符等；新增结果模型 `ListBucketResultV2`。
+- 新增：对象元数据模型 `ObjectMeta`，完善对象信息解析能力。
+- 新增：`Service` 接口与错误类型扩展，统一服务能力与异常表达。
+- 改进：下载对象实现（`getObject`）更完善，健壮性提升。
+- 示例：更新 `example/example.dart` 展示上述能力。
+
+### 🔄 兼容性
+- 向后兼容：仅新增能力，无破坏性变更。
+
+### 📚 文档
+- 更新中文更新日志，记录 1.2.1 版本内容。
+
 ## 1.2.0
 
 ### ✨ 主要新功能

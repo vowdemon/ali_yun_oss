@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:dart_aliyun_oss/src/client/client.dart';
 import 'package:dart_aliyun_oss/src/exceptions/exceptions.dart';
 import 'package:dart_aliyun_oss/src/interfaces/service.dart';
@@ -56,13 +54,15 @@ mixin ListBucketResultImpl on IOSSService {
     final OSSClient client = this as OSSClient;
 
     // 使用更简洁的 requestKey
-    final String requestKey = 'listBucketResultV2_${DateTime.now().millisecondsSinceEpoch}';
+    final String requestKey =
+        'listBucketResultV2_${DateTime.now().millisecondsSinceEpoch}';
 
-    return client.requestHandler.executeRequest(requestKey, params?.cancelToken, (
+    return client.requestHandler.executeRequest(requestKey, params?.cancelToken,
+        (
       CancelToken cancelToken,
     ) async {
       // 更新请求参数
-      final Map<String, dynamic> queryParameters = {
+      final Map<String, dynamic> queryParameters = <String, dynamic>{
         'list-type': '2', // 必须为2表示V2版本
         if (delimiter != null) 'delimiter': delimiter,
         if (startAfter != null) 'start-after': startAfter,
@@ -71,8 +71,10 @@ mixin ListBucketResultImpl on IOSSService {
         if (prefix != null) 'prefix': prefix,
         'fetch-owner': fetchOwner.toString(),
       };
-      OSSRequestParams updatedParams = params ?? const OSSRequestParams(queryParameters: <String, dynamic>{});
-      queryParameters.addAll(updatedParams.queryParameters ?? {});
+      OSSRequestParams updatedParams = params ??
+          const OSSRequestParams(queryParameters: <String, dynamic>{});
+      queryParameters
+          .addAll(updatedParams.queryParameters ?? <String, dynamic>{});
       updatedParams = updatedParams.copyWith(queryParameters: queryParameters);
 
       final Uri uri = client.buildOssUri(
@@ -98,7 +100,8 @@ mixin ListBucketResultImpl on IOSSService {
         responseType: ResponseType.plain,
       );
 
-      final Response<dynamic> response = await client.requestHandler.sendRequest(
+      final Response<dynamic> response =
+          await client.requestHandler.sendRequest(
         uri: uri,
         method: 'GET',
         options: requestOptions,
@@ -116,7 +119,8 @@ mixin ListBucketResultImpl on IOSSService {
       }
 
       try {
-        final ListBucketResultV2 result = ListBucketResultV2.parse(response.data!);
+        final ListBucketResultV2 result =
+            ListBucketResultV2.parse(response.data!);
         return Response<ListBucketResultV2>(
           data: result,
           headers: response.headers,
