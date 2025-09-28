@@ -405,6 +405,10 @@ class AliOssV4SignUtils {
   /// - [additionalHeaders] 需要参与签名的额外头名称集合
   ///
   /// 返回格式化后的规范头列表字符串, 每行一个头部, 格式为 key:value, 末尾有换行符
+  ///
+  /// 兼容性说明（依据阿里云文档）：
+  /// - x-oss-*、content-type、content-md5 若存在则应参与签名（不需要出现在 AdditionalHeaders 中）。
+  /// - AdditionalHeaders 仅用于声明除上述“默认/条件性头”之外、必须参与签名的头（例如 host）。
   static String _buildCanonicalHeaders(
     Map<String, dynamic> headers,
     Set<String> additionalHeaders,
@@ -415,26 +419,27 @@ class AliOssV4SignUtils {
       lowerHeaders[key.toLowerCase()] = (value?.toString() ?? '').trim();
     });
 
-    // 合并默认头和额外头
+    // 自动收集“若存在则参与签名”的头部：x-oss-* / content-type / content-md5
+    final Set<String> autoSignHeaders = lowerHeaders.keys
+        .where((String k) => _isDefaultSignHeader(k))
+        .toSet();
+
+    // 合并：额外声明的头 ∪ 默认固定头 ∪ 自动收集头
     final Set<String> allSignHeaders = <String>{
-      ...additionalHeaders,
+      ...additionalHeaders.map((e) => e.toLowerCase()),
       ..._defaultSignHeaders,
+      ...autoSignHeaders,
     };
 
-    // 构建规范头列表
+    // 仅添加存在于 lowerHeaders 且属于签名集合的头部
     final List<String> headerList = <String>[];
-
-    // 只添加存在于 lowerHeaders 中的头部
     lowerHeaders.forEach((String key, String value) {
       if (allSignHeaders.contains(key)) {
         headerList.add('$key:$value');
       }
     });
 
-    // 按字典序排序
     headerList.sort();
-
-    // 返回格式化后的字符串, 末尾必须有换行符
     return '${headerList.join('\n')}\n';
   }
 

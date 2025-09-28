@@ -58,6 +58,16 @@ class AliOssV4SignStrategy implements IOSSSignStrategy {
     int? contentLength,
     DateTime? dateTime,
   }) {
+    // 按文档要求：
+    // - host 应作为额外参与签名的头（AdditionalHeaders）
+    // - 使用 STS 时，x-oss-security-token 存在且应参与签名（作为默认/条件性头，不出现在 AdditionalHeaders 字符串，但加入集合以确保规范头包含）
+    final Set<String> addHeaders = <String>{'host'};
+    final String? secToken = _config.securityToken;
+    if (secToken != null && secToken.isNotEmpty) {
+      // 作为参与签名的头加入集合（_buildCanonicalHeaders 会将 x-oss-* 作为默认签名头处理）
+      addHeaders.add('x-oss-security-token');
+    }
+
     return AliOssV4SignUtils.signedHeaders(
       accessKeyId: _config.accessKeyId,
       accessKeySecret: _config.accessKeySecret,
@@ -70,6 +80,7 @@ class AliOssV4SignStrategy implements IOSSSignStrategy {
       headers: headers,
       cname: _config.cname,
       securityToken: _config.securityToken,
+      additionalHeaders: addHeaders,
       dateTime: dateTime,
     );
   }
