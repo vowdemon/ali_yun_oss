@@ -2,6 +2,21 @@
 
 [English](CHANGELOG.md) | [中文](CHANGELOG_zh.md)
 
+## 1.2.2
+
+### 🐛 修复
+- 修复：使用 STS 的 V4 头部签名请求返回 403 的问题。
+  - 头部签名路径显式将 `host` 加入签名（AdditionalHeaders）。
+  - 当存在 STS 时，确保 `x-oss-security-token` 参与签名。
+  - 规范化阶段自动包含所有存在的 `x-oss-*`、`content-type`、`content-md5`，与阿里云文档一致。
+  - 关联修复：#6。
+
+### 🔄 兼容性
+- 向后兼容：仅行为收敛与规范化，不包含破坏性变更。
+
+### 📚 文档
+- 参考：阿里云文档《在URL中包含V4签名》。
+
 ## 1.2.1
 
 ### ✨ 功能增强

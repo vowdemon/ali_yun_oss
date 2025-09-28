@@ -2,6 +2,21 @@
 
 [English](CHANGELOG.md) | [中文](CHANGELOG_zh.md)
 
+## 1.2.2
+
+### 🐛 Fixes
+- Fix: 403 on V4 header-signing requests when using STS.
+  - Explicitly include `host` in AdditionalHeaders for header signing.
+  - Ensure `x-oss-security-token` is signed when STS is present.
+  - Canonical headers now auto-include existing `x-oss-*`, `content-type`, and `content-md5` per Aliyun docs.
+  - Related: #6.
+
+### 🔄 Compatibility
+- Backward compatible: behavioral convergence to spec, no breaking changes.
+
+### 📚 Docs
+- Reference: Aliyun OSS "Add signatures to URLs (V4)".
+
 ## 1.2.1
 
 ### ✨ Enhancements
