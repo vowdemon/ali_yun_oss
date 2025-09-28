@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print, avoid_redundant_argument_values
+
 import 'package:dart_aliyun_oss/dart_aliyun_oss.dart';
 
 /// 自定义查询参数示例

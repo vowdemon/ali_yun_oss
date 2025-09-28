@@ -1,6 +1,4 @@
 import 'package:dart_aliyun_oss/dart_aliyun_oss.dart';
-import 'package:dart_aliyun_oss/src/strategy/v1_sign_utils.dart';
-import 'package:dart_aliyun_oss/src/strategy/v4_sign_utils.dart';
 import 'package:test/test.dart';
 
 void main() {

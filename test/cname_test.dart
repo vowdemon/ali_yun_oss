@@ -1,4 +1,4 @@
-// ignore_for_file: avoid_print
+// ignore_for_file: avoid_print, avoid_redundant_argument_values
 
 import 'package:dart_aliyun_oss/dart_aliyun_oss.dart';
 import 'package:test/test.dart';
@@ -184,7 +184,9 @@ void main() {
         expect(uri.host, 'img.example.com');
         expect(uri.path, '/test/file.jpg');
         expect(
-            uri.queryParameters['x-oss-credential'], contains('test-key-id'));
+          uri.queryParameters['x-oss-credential'],
+          contains('test-key-id'),
+        );
       });
     });
 
