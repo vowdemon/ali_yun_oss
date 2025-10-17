@@ -2,6 +2,18 @@
 
 [English](CHANGELOG.md) | [中文](CHANGELOG_zh.md)
 
+## 1.2.3
+
+### ✨ Enhancements
+- OSSLogInterceptor: Switch to grouped logs per request/response/error to reduce console noise.
+- Add `groupPrint` parameter (default: true). Set `groupPrint: false` to revert legacy per-line logging.
+- Increase default `maxLogLength` from 500 to 4000 to reduce truncation.
+- Keep sensitive header masking and size-only prints for binary bodies.
+- Default logging function restored to `print`.
+
+### 🔄 Compatibility
+- Backward compatible: additive behavior only, no breaking changes.
+
 ## 1.2.2
 
 ### 🐛 Fixes

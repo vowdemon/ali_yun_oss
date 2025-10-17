@@ -30,7 +30,8 @@ class OSSLogInterceptor extends Interceptor {
     this.error = true,
     this.logPrint = print,
     this.sensitiveHeaders = const <String>['Authorization', 'Proxy-Authorization'],
-    this.maxLogLength = 500,
+    this.maxLogLength = 4000,
+    this.groupPrint = true,
   });
 
   /// 是否打印请求信息
@@ -60,6 +61,9 @@ class OSSLogInterceptor extends Interceptor {
   /// 字符串日志的最大打印长度
   final int maxLogLength;
 
+  /// 是否将一次请求/响应/错误聚合为单条日志打印
+  final bool groupPrint;
+
   /// 拦截请求
   ///
   /// 在请求发送前被调用,打印请求相关信息。
@@ -68,28 +72,49 @@ class OSSLogInterceptor extends Interceptor {
   /// [handler] 请求拦截处理器
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    logPrint('*** OSS Request ***');
-    _printKV('uri', options.uri);
+    if (groupPrint) {
+      final StringBuffer buf = StringBuffer();
+      buf.writeln('*** OSS Request ***');
+      buf.writeln(_kvLine('uri', options.uri));
 
-    if (request) {
-      _printKV('method', options.method);
-      _printKV('responseType', options.responseType.toString());
+      if (request) {
+        buf.writeln(_kvLine('method', options.method));
+        buf.writeln(_kvLine('responseType', options.responseType.toString()));
+      }
+
+      if (requestHeader) {
+        buf.writeln('headers:');
+        options.headers.forEach((String key, dynamic v) {
+          buf.writeln(_kvLine(' $key', v));
+        });
+      }
+
+      if (requestBody && options.data != null) {
+        buf.writeln('data:');
+        buf.writeln(_formatData(options.data));
+      }
+
+      logPrint(buf.toString());
+    } else {
+      // 兼容旧行为：逐行打印
+      logPrint('*** OSS Request ***');
+      _printKV('uri', options.uri);
+      if (request) {
+        _printKV('method', options.method);
+        _printKV('responseType', options.responseType.toString());
+      }
+      if (requestHeader) {
+        logPrint('headers:');
+        options.headers.forEach((String key, dynamic v) {
+          _printKV(' $key', v);
+        });
+      }
+      if (requestBody && options.data != null) {
+        logPrint('data:');
+        _printData(options.data);
+      }
+      logPrint('');
     }
-
-    if (requestHeader) {
-      logPrint('headers:');
-      options.headers.forEach((String key, dynamic v) {
-        // _printKV handles sensitive header masking
-        _printKV(' $key', v);
-      });
-    }
-
-    if (requestBody && options.data != null) {
-      logPrint('data:');
-      _printData(options.data);
-    }
-
-    logPrint('');
     handler.next(options);
   }
 
@@ -101,8 +126,29 @@ class OSSLogInterceptor extends Interceptor {
   /// [handler] 响应拦截处理器
   @override
   void onResponse(Response<dynamic> response, ResponseInterceptorHandler handler) {
-    logPrint('*** OSS Response ***');
-    _printResponse(response);
+    if (groupPrint) {
+      final StringBuffer buf = StringBuffer();
+      buf.writeln('*** OSS Response ***');
+      buf.writeln(_kvLine('uri', response.requestOptions.uri));
+      if (responseHeader) {
+        buf.writeln(_kvLine('statusCode', response.statusCode));
+        if (response.isRedirect == true) {
+          buf.writeln(_kvLine('redirect', response.realUri));
+        }
+        buf.writeln('headers:');
+        response.headers.forEach((String key, List<String> v) {
+          buf.writeln(_kvLine(' $key', v.join('\r\n\t')));
+        });
+      }
+      if (responseBody) {
+        buf.writeln('Response Data:');
+        buf.writeln(_formatData(response.data));
+      }
+      logPrint(buf.toString());
+    } else {
+      logPrint('*** OSS Response ***');
+      _printResponse(response);
+    }
     handler.next(response);
   }
 
@@ -115,13 +161,40 @@ class OSSLogInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     if (error) {
-      logPrint('*** OSS Error ***:');
-      logPrint('uri: ${err.requestOptions.uri}');
-      logPrint('$err');
-      if (err.response != null) {
-        _printResponse(err.response!);
+      if (groupPrint) {
+        final StringBuffer buf = StringBuffer();
+        buf.writeln('*** OSS Error ***');
+        buf.writeln(_kvLine('uri', err.requestOptions.uri));
+        buf.writeln(err.toString());
+        final Response<dynamic>? resp = err.response;
+        if (resp != null) {
+          buf.writeln('--- Response Snapshot ---');
+          buf.writeln(_kvLine('uri', resp.requestOptions.uri));
+          if (responseHeader) {
+            buf.writeln(_kvLine('statusCode', resp.statusCode));
+            if (resp.isRedirect == true) {
+              buf.writeln(_kvLine('redirect', resp.realUri));
+            }
+            buf.writeln('headers:');
+            resp.headers.forEach((String key, List<String> v) {
+              buf.writeln(_kvLine(' $key', v.join('\r\n\t')));
+            });
+          }
+          if (responseBody) {
+            buf.writeln('Response Data:');
+            buf.writeln(_formatData(resp.data));
+          }
+        }
+        logPrint(buf.toString());
+      } else {
+        logPrint('*** OSS Error ***:');
+        logPrint('uri: ${err.requestOptions.uri}');
+        logPrint('$err');
+        if (err.response != null) {
+          _printResponse(err.response!);
+        }
+        logPrint('');
       }
-      logPrint('');
     }
     handler.next(err);
   }
@@ -168,6 +241,15 @@ class OSSLogInterceptor extends Interceptor {
     }
   }
 
+  /// 生成键值对行（不直接打印，便于分组输出）
+  String _kvLine(String key, Object? v) {
+    final String lowerCaseKey = key.trim().toLowerCase();
+    final bool isSensitive = sensitiveHeaders.any(
+      (String sensitiveHeader) => sensitiveHeader.toLowerCase() == lowerCaseKey,
+    );
+    return isSensitive ? '$key: *** MASKED ***' : '$key: $v';
+  }
+
   /// 打印请求或响应体数据
   ///
   /// 根据数据类型进行不同的处理：
@@ -189,7 +271,7 @@ class OSSLogInterceptor extends Interceptor {
           'Map data: {${data.keys.take(maxMapEntries).map((dynamic key) => '$key: ${data[key]}').join(', ')}, ...} (being cut down, total: ${data.length} entries)',
         );
       } else {
-        logPrint(data);
+        logPrint(data.toString());
       }
     } else if (data is String) {
       // 字符串数据,如果过长则截断
@@ -203,6 +285,26 @@ class OSSLogInterceptor extends Interceptor {
     } else {
       // 其他类型数据
       logPrint(data.toString());
+  }
+  }
+
+  /// 将数据格式化为字符串（供分组输出使用）
+  String _formatData(dynamic data) {
+    const int maxMapEntries = 10;
+    if (data is List<int>) {
+      return 'File data: ${data.length} bytes';
+    } else if (data is Map) {
+      if (data.length > maxMapEntries) {
+        return 'Map data: {${data.keys.take(maxMapEntries).map((dynamic key) => '$key: ${data[key]}').join(', ')}, ...} (being cut down, total: ${data.length} entries)';
+      }
+      return data.toString();
+    } else if (data is String) {
+      if (data.length > maxLogLength) {
+        return '${data.substring(0, maxLogLength)}... (being cut down, total: ${data.length})';
+      }
+      return data;
+    } else {
+      return data.toString();
     }
   }
 }
