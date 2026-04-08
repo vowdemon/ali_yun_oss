@@ -2,6 +2,22 @@
 
 [English](CHANGELOG.md) | [中文](CHANGELOG_zh.md)
 
+## 2.0.0
+
+### 💥 Breaking Changes
+- Remove the singleton-based `OSSClient.init()` / `OSSClient.instance` API.
+- `OSSClient` is now instantiated directly with `OSSClient(config)`.
+- Multiple `OSSClient` instances can now coexist and connect to different buckets at the same time.
+
+### ✨ Enhancements
+- Move client initialization state fully into each `OSSClient` instance, including config, request handler, request manager, and signing strategies.
+- Update examples and README usage to the new multi-instance API.
+- Add regression coverage to verify client instances do not overwrite each other's bucket configuration.
+
+### 📚 Docs
+- Add a multi-instance migration note in examples and README.
+- Sync changelog entries with the `2.0.0` release line.
+
 ## 1.2.3
 
 ### ✨ Enhancements

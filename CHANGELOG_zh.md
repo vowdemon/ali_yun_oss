@@ -2,6 +2,22 @@
 
 [English](CHANGELOG.md) | [中文](CHANGELOG_zh.md)
 
+## 2.0.0
+
+### 💥 破坏性变更
+- 移除基于单例的 `OSSClient.init()` / `OSSClient.instance` API。
+- `OSSClient` 改为直接通过 `OSSClient(config)` 创建实例。
+- 现在可以同时创建多个 `OSSClient` 实例，并分别连接不同的 bucket。
+
+### ✨ 增强
+- 将客户端初始化状态完全下沉到实例级别，包括配置、请求处理器、请求管理器和签名策略。
+- 更新 README 与示例代码，统一切换到多实例 API。
+- 新增回归测试，验证多个客户端实例不会互相覆盖 bucket 配置。
+
+### 📚 文档
+- 补充多实例用法对应的示例与迁移说明。
+- 同步更新 `2.0.0` 版本的 changelog 记录。
+
 ## 1.2.3
 
 ### ✨ 增强
