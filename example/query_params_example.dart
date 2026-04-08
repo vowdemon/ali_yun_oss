@@ -16,7 +16,7 @@ void main() async {
     region: 'cn-hangzhou',
   );
 
-  final OSSClient client = OSSClient.init(config);
+  final OSSClient client = OSSClient(config);
 
   print('=== OSS 自定义查询参数示例 ===\n');
 

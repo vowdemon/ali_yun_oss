@@ -36,7 +36,7 @@ import 'request_manager.dart';
 /// - 请求取消管理
 ///
 /// 主要特性：
-/// - 单例模式：通过 [init] 方法初始化并获取全局唯一实例
+/// - 多实例模式：每个 [OSSClient] 实例持有独立配置，可连接不同 Bucket
 /// - 多签名支持：同时支持 OSS V1 和 V4 签名算法
 /// - 请求管理：内置请求管理器,支持取消指定请求或所有请求
 /// - 自动配置：根据提供的 [OSSConfig] 自动配置请求处理器和签名策略
@@ -44,8 +44,8 @@ import 'request_manager.dart';
 ///
 /// 使用流程：
 /// 1. 创建 [OSSConfig] 配置对象
-/// 2. 调用 [OSSClient.init] 初始化客户端
-/// 3. 使用返回的单例实例调用各种 OSS 操作方法
+/// 2. 直接创建 [OSSClient] 实例
+/// 3. 使用实例调用各种 OSS 操作方法
 ///
 /// 示例：
 /// ```dart
@@ -56,7 +56,7 @@ import 'request_manager.dart';
 ///   bucketName: 'your-bucket-name',
 /// );
 ///
-/// final client = OSSClient.init(config);
+/// final client = OSSClient(config);
 ///
 /// // 下载文件
 /// final response = await client.getObject('example.txt');
@@ -89,18 +89,52 @@ class OSSClient
   // 构造函数
   //============================================================
 
-  /// 私有构造函数
-  OSSClient._();
+  factory OSSClient(
+    OSSConfig config, {
+    Duration connectTimeout = const Duration(seconds: 15),
+    Duration receiveTimeout = const Duration(minutes: 5),
+    Duration sendTimeout = const Duration(minutes: 10),
+  }) {
+    try {
+      _validateConfig(config);
+      final OSSRequestManager requestManager = OSSRequestManager();
+      final Dio dio = _buildDio(
+        config: config,
+        connectTimeout: connectTimeout,
+        receiveTimeout: receiveTimeout,
+        sendTimeout: sendTimeout,
+      );
+      log(
+        'OSSClient 初始化成功 - 端点: ${config.endpoint}, 存储空间: ${config.bucketName}, 区域: ${config.region}',
+      );
+      return OSSClient._internal(
+        config: config,
+        requestHandler: OSSRequestHandler(dio, requestManager),
+        signStrategies: <bool, IOSSSignStrategy>{
+          true: V1SignStrategy(config),
+          false: AliOssV4SignStrategy(config),
+        },
+        requestManager: requestManager,
+      );
+    } catch (e) {
+      log('OSSClient 初始化失败: $e', level: 1000);
+      throw Exception('初始化 OSSClient 失败: $e');
+    }
+  }
 
-  //============================================================
-  // 私有成员变量 & 单例实现
-  //============================================================
+  OSSClient._internal({
+    required this.config,
+    required this.requestHandler,
+    required Map<bool, IOSSSignStrategy> signStrategies,
+    required OSSRequestManager requestManager,
+  }) : _signStrategies = signStrategies,
+       _requestManager = requestManager;
 
   /// OSS 配置信息
-  late final OSSConfig config;
+  final OSSConfig config;
 
   /// 底层 HTTP 请求处理器
-  late final OSSRequestHandler requestHandler;
+  final OSSRequestHandler requestHandler;
 
   /// 签名策略映射
   ///
@@ -110,10 +144,10 @@ class OSSClient
   ///
   /// 这种设计允许客户端根据需要切换不同的签名算法,同时保持向后兼容性。
   /// 对于新应用,建议使用 V4 签名算法（false键）。
-  late final Map<bool, IOSSSignStrategy> _signStrategies;
+  final Map<bool, IOSSSignStrategy> _signStrategies;
 
   /// 请求管理器,用于取消请求
-  final OSSRequestManager _requestManager = OSSRequestManager();
+  final OSSRequestManager _requestManager;
 
   /// 获取请求管理器实例
   ///
@@ -132,137 +166,46 @@ class OSSClient
   /// ```
   OSSRequestManager get requestManager => _requestManager;
 
-  /// 单例实例
-  static final OSSClient _instance = OSSClient._();
-
-  /// 标记客户端是否已初始化
-  static bool _initialized = false;
-
-  /// 获取 OSSClient 单例实例
-  ///
-  /// 提供对已初始化的 OSSClient 单例的直接访问。
-  /// 这个 getter 方法允许在不再次调用 [init] 方法的情况下获取已初始化的实例。
-  ///
-  /// 注意：在使用此 getter 前,必须先调用 [init] 方法初始化客户端。
-  /// 如果客户端尚未初始化,将抛出异常。
-  ///
-  /// 返回已初始化的 [OSSClient] 单例。
-  ///
-  /// 示例：
-  /// ```dart
-  /// // 首先初始化客户端
-  /// OSSClient.init(config);
-  ///
-  /// // 然后在其他地方使用 instance getter 获取实例
-  /// final client = OSSClient.instance;
-  /// await client.putObject(file, 'example.txt');
-  /// ```
-  static OSSClient get instance {
-    if (!_initialized) {
-      throw StateError('OSSClient 尚未初始化。请先调用 OSSClient.init() 方法。');
+  static void _validateConfig(OSSConfig config) {
+    if (config.accessKeyId.isEmpty) {
+      throw ArgumentError('accessKeyId 不能为空');
     }
-    return _instance;
+    if (config.accessKeySecret.isEmpty) {
+      throw ArgumentError('accessKeySecret 不能为空');
+    }
+    if (config.endpoint.isEmpty) {
+      throw ArgumentError('endpoint 不能为空');
+    }
+    if (config.bucketName.isEmpty) {
+      throw ArgumentError('bucketName 不能为空');
+    }
   }
 
-  //============================================================
-  // 初始化
-  //============================================================
-
-  /// 初始化OSS客户端单例
-  ///
-  /// 必须在使用客户端前调用此方法进行初始化。该方法实现了单例模式,
-  /// 确保在整个应用中只有一个 OSSClient 实例。
-  ///
-  /// 初始化过程：
-  /// 1. 设置客户端配置
-  /// 2. 初始化请求处理器（如果未提供 Dio 实例,则创建默认实例）
-  /// 3. 初始化签名策略（V1 和 V4）
-  /// 4. 记录初始化日志
-  ///
-  /// 参数：
-  /// - [config] OSS配置信息 ([OSSConfig]),包含访问凭证、存储空间信息等
-  ///
-  /// 返回初始化的 [OSSClient] 单例实例,可用于执行各种 OSS 操作
-  ///
-  /// 示例：
-  /// ```dart
-  /// final config = OSSConfig(
-  ///   accessKeyId: 'your-access-key-id',
-  ///   accessKeySecret: 'your-access-key-secret',
-  ///   endpoint: 'oss-cn-hangzhou.aliyuncs.com',
-  ///   bucketName: 'your-bucket-name',
-  /// );
-  ///
-  /// final client = OSSClient.init(config);
-  /// ```
-  static OSSClient init(
-    OSSConfig config, {
-    Duration connectTimeout = const Duration(seconds: 15),
-    Duration receiveTimeout = const Duration(minutes: 5),
-    Duration sendTimeout = const Duration(minutes: 10),
+  static Dio _buildDio({
+    required OSSConfig config,
+    required Duration connectTimeout,
+    required Duration receiveTimeout,
+    required Duration sendTimeout,
   }) {
-    try {
-      // 验证配置
-      if (config.accessKeyId.isEmpty) {
-        throw ArgumentError('accessKeyId 不能为空');
-      }
-      if (config.accessKeySecret.isEmpty) {
-        throw ArgumentError('accessKeySecret 不能为空');
-      }
-      if (config.endpoint.isEmpty) {
-        throw ArgumentError('endpoint 不能为空');
-      }
-      if (config.bucketName.isEmpty) {
-        throw ArgumentError('bucketName 不能为空');
-      }
-
-      // 设置配置
-      _instance.config = config;
-
-      // 创建或使用提供的 Dio 实例
-      final Dio dio = config.dio ??
-          Dio(
-            BaseOptions(
-              connectTimeout: connectTimeout,
-              receiveTimeout: receiveTimeout,
-              sendTimeout: sendTimeout,
-            ),
-          );
-
-      // 添加日志拦截器（如果启用）
-      if (config.enableLogInterceptor) {
-        dio.interceptors.add(
-          const OSSLogInterceptor(requestBody: true, responseBody: true),
+    final Dio dio = config.dio ??
+        Dio(
+          BaseOptions(
+            connectTimeout: connectTimeout,
+            receiveTimeout: receiveTimeout,
+            sendTimeout: sendTimeout,
+          ),
         );
-      }
 
-      // 初始化请求处理器
-      _instance.requestHandler = OSSRequestHandler(
-        dio,
-        _instance._requestManager,
+    if (config.enableLogInterceptor) {
+      dio.interceptors.add(
+        const OSSLogInterceptor(requestBody: true, responseBody: true),
       );
-
-      // 初始化签名策略
-      // 创建两种签名策略的实例,并存储在映射中供后续使用
-      _instance._signStrategies = <bool, IOSSSignStrategy>{
-        true: V1SignStrategy(config), // V1 签名算法（旧版，基于 HMAC-SHA1）
-        false: AliOssV4SignStrategy(config), // V4 签名算法（新版,基于 HMAC-SHA256,默认使用）
-      };
-
-      // 记录初始化日志
-      log(
-        'OSSClient 初始化成功 - 端点: ${config.endpoint}, 存储空间: ${config.bucketName}, 区域: ${config.region}',
-      );
-
-      // 设置初始化标志
-      _initialized = true;
-
-      return _instance;
-    } catch (e) {
-      // 记录错误并重新抛出
-      log('OSSClient 初始化失败: $e', level: 1000);
-      throw Exception('初始化 OSSClient 失败: $e');
     }
+    if (config.interceptors != null && config.interceptors!.isNotEmpty) {
+      dio.interceptors.addAll(config.interceptors!);
+    }
+
+    return dio;
   }
 
   //============================================================

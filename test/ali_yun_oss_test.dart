@@ -384,7 +384,7 @@ void main() {
       // 这个测试只验证初始化不会抛出异常
       expect(
         () {
-          OSSClient.init(OSSConfig.forTest());
+          OSSClient(OSSConfig.forTest());
         },
         returnsNormally,
       );
@@ -394,7 +394,7 @@ void main() {
       // 测试缺少必要参数时应抛出异常
       expect(
         () {
-          OSSClient.init(
+          OSSClient(
             OSSConfig.static(
               endpoint: '', // 空端点
               region: 'cn-hangzhou',
@@ -409,7 +409,7 @@ void main() {
 
       expect(
         () {
-          OSSClient.init(
+          OSSClient(
             OSSConfig.static(
               endpoint: 'oss-cn-hangzhou.aliyuncs.com',
               region: 'cn-hangzhou',
@@ -423,22 +423,29 @@ void main() {
       ); // 使用 throwsException 而不是 throwsArgumentError
     });
 
-    test('OSSClient 是单例模式', () {
-      // 跳过测试,因为在测试环境中难以重置单例状态
-      print('跳过单例模式测试：在测试环境中难以重置单例状态');
-
-      // 在实际应用中,以下代码应该正常工作
-      /*
-      final client1 = OSSClient.init(OSSConfig.forTest());
-      final client2 = OSSClient.init(
+    test('OSSClient 支持多实例且配置互不影响', () {
+      final OSSClient client1 = OSSClient(
+        OSSConfig.forTest(bucketName: 'bucket-a'),
+      );
+      final OSSClient client2 = OSSClient(
         OSSConfig.forTest(
-          accessKeyId: 'different-key', // 尝试使用不同的配置
+          bucketName: 'bucket-b',
+          endpoint: 'oss-cn-beijing.aliyuncs.com',
+          region: 'cn-beijing',
         ),
       );
 
-      // 验证两次初始化返回相同的实例
-      expect(identical(client1, client2), isTrue);
-      */
+      expect(identical(client1, client2), isFalse);
+      expect(client1.config.bucketName, 'bucket-a');
+      expect(client2.config.bucketName, 'bucket-b');
+      expect(
+        client1.buildOssUri(fileKey: 'demo.txt').host,
+        'bucket-a.oss-cn-hangzhou.aliyuncs.com',
+      );
+      expect(
+        client2.buildOssUri(fileKey: 'demo.txt').host,
+        'bucket-b.oss-cn-beijing.aliyuncs.com',
+      );
     });
   });
 
@@ -529,7 +536,7 @@ void main() {
       // 注释示例代码,避免出现“死代码”警告
       /*
       // 以下代码仅作为示例,实际使用时需要去除注释
-      final client = OSSClient.init(
+      final client = OSSClient(
         OSSConfig(
           endpoint: 'your-endpoint.aliyuncs.com',
           region: 'your-region',
@@ -547,7 +554,6 @@ void main() {
   group('PutObject 多数据类型支持测试', () {
     test('putObjectFromString 方法签名验证', () {
       // 这个测试验证方法签名存在性
-      // 由于 OSSClient 是单例，我们不能重复初始化，所以只验证方法存在
 
       // 验证 putObjectFromString 方法存在于 IOSSService 接口中
       expect(IOSSService, isNotNull);

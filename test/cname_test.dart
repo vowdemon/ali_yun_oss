@@ -91,7 +91,7 @@ void main() {
           cname: true,
         );
 
-        final OSSClient client = OSSClient.init(config);
+        final OSSClient client = OSSClient(config);
         final Uri uri = client.buildOssUri(fileKey: 'test/file.jpg');
 
         expect(uri.host, 'img.example.com');
@@ -99,35 +99,43 @@ void main() {
         expect(uri.scheme, 'https');
       });
 
-      // 注意：由于OSSClient是单例，我们不能在同一个测试进程中多次初始化
-      // 这个测试通过直接验证配置来测试逻辑
-      test('禁用cname时配置应该正确', () {
-        final OSSConfig config = OSSConfig.static(
-          accessKeyId: 'test-key-id',
-          accessKeySecret: 'test-key-secret',
-          bucketName: 'test-bucket',
-          endpoint: 'oss-cn-hangzhou.aliyuncs.com',
-          region: 'cn-hangzhou',
-          cname: false,
+      test('禁用cname时应该使用bucket子域名', () {
+        final OSSClient client = OSSClient(
+          OSSConfig.static(
+            accessKeyId: 'test-key-id',
+            accessKeySecret: 'test-key-secret',
+            bucketName: 'test-bucket',
+            endpoint: 'oss-cn-hangzhou.aliyuncs.com',
+            region: 'cn-hangzhou',
+            cname: false,
+          ),
         );
 
-        expect(config.cname, isFalse);
-        expect(config.endpoint, 'oss-cn-hangzhou.aliyuncs.com');
-        expect(config.bucketName, 'test-bucket');
+        final Uri uri = client.buildOssUri(fileKey: 'test/file.jpg');
+
+        expect(uri.host, 'test-bucket.oss-cn-hangzhou.aliyuncs.com');
+        expect(uri.path, '/test/file.jpg');
       });
     });
 
     group('签名URL生成测试', () {
       test('V1签名应该支持自定义域名', () {
-        // 由于OSSClient是单例，我们使用已初始化的客户端
-        // 这里主要测试签名URL是否包含正确的域名
-        final OSSClient client = OSSClient.instance;
+        final OSSClient client = OSSClient(
+          OSSConfig.static(
+            accessKeyId: 'test-key-id',
+            accessKeySecret: 'test-key-secret',
+            bucketName: 'test-bucket',
+            endpoint: 'img.example.com',
+            region: 'cn-hangzhou',
+            cname: true,
+          ),
+        );
+
         final String signedUrl = client.signedUrl(
           'test/file.jpg',
           isV1Signature: true,
         );
 
-        // 验证URL包含自定义域名（从之前的测试中设置）
         expect(signedUrl, contains('img.example.com'));
         expect(signedUrl, contains('test/file.jpg'));
         expect(signedUrl, contains('OSSAccessKeyId=test-key-id'));
@@ -135,14 +143,22 @@ void main() {
       });
 
       test('V4签名应该支持自定义域名', () {
-        // 使用已初始化的客户端测试V4签名
-        final OSSClient client = OSSClient.instance;
+        final OSSClient client = OSSClient(
+          OSSConfig.static(
+            accessKeyId: 'test-key-id',
+            accessKeySecret: 'test-key-secret',
+            bucketName: 'test-bucket',
+            endpoint: 'img.example.com',
+            region: 'cn-hangzhou',
+            cname: true,
+          ),
+        );
+
         final String signedUrl = client.signedUrl(
           'test/file.jpg',
           isV1Signature: false,
         );
 
-        // 验证URL包含自定义域名
         expect(signedUrl, contains('img.example.com'));
         expect(signedUrl, contains('test/file.jpg'));
         expect(signedUrl, contains('x-oss-credential=test-key-id'));

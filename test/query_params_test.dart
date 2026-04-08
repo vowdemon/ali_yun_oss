@@ -149,7 +149,7 @@ void main() {
         bucketName: bucket,
         region: region,
       );
-      final OSSClient client = OSSClient.init(config);
+      final OSSClient client = OSSClient(config);
 
       final String url = client.signedUrl(
         key,

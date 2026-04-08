@@ -32,8 +32,8 @@ dart pub get
 ```dart
 import 'package:dart_aliyun_oss/dart_aliyun_oss.dart';
 
-// Initialize OSS client
-final oss = OSSClient.init(
+// Create OSS client
+final oss = OSSClient(
   OSSConfig(
     endpoint: 'your-endpoint.aliyuncs.com', // e.g. oss-cn-hangzhou.aliyuncs.com
     region: 'your-region', // e.g. cn-hangzhou
@@ -49,8 +49,8 @@ final oss = OSSClient.init(
 If you have bound a custom domain to your OSS bucket, you can use it instead of the default OSS endpoint:
 
 ```dart
-// Initialize OSS client with custom domain
-final oss = OSSClient.init(
+// Create OSS client with custom domain
+final oss = OSSClient(
   OSSConfig.static(
     endpoint: 'img.example.com', // Your custom domain
     region: 'cn-hangzhou',
@@ -222,7 +222,7 @@ final OSSConfig configWithSTS = OSSConfig.static(
   region: 'cn-hangzhou',
 );
 
-final OSSClient ossWithSTS = OSSClient.init(configWithSTS);
+final OSSClient ossWithSTS = OSSClient(configWithSTS);
 
 // Upload file using STS temporary token
 await ossWithSTS.putObject(
@@ -275,7 +275,7 @@ class StsTokenManager {
 
 // Initialize client with dynamic STS token refresh
 final stsManager = StsTokenManager();
-final OSSClient ossWithDynamicSTS = OSSClient.init(
+final OSSClient ossWithDynamicSTS = OSSClient(
   OSSConfig(
     accessKeyIdProvider: () => stsManager.accessKeyId,
     accessKeySecretProvider: () => stsManager.accessKeySecret,

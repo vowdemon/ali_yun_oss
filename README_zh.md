@@ -32,8 +32,8 @@ dart pub get
 ```dart
 import 'package:dart_aliyun_oss/dart_aliyun_oss.dart';
 
-// 初始化OSS客户端
-final oss = OSSClient.init(
+// 创建OSS客户端
+final oss = OSSClient(
   OSSConfig(
     endpoint: 'your-endpoint.aliyuncs.com', // 例如: oss-cn-hangzhou.aliyuncs.com
     region: 'your-region', // 例如: cn-hangzhou
@@ -49,8 +49,8 @@ final oss = OSSClient.init(
 如果您已经将自定义域名绑定到OSS存储空间，可以使用自定义域名代替默认的OSS端点：
 
 ```dart
-// 使用自定义域名初始化OSS客户端
-final oss = OSSClient.init(
+// 使用自定义域名创建OSS客户端
+final oss = OSSClient(
   OSSConfig.static(
     endpoint: 'img.example.com', // 您的自定义域名
     region: 'cn-hangzhou',
@@ -222,7 +222,7 @@ final OSSConfig configWithSTS = OSSConfig.static(
   region: 'cn-hangzhou',
 );
 
-final OSSClient ossWithSTS = OSSClient.init(configWithSTS);
+final OSSClient ossWithSTS = OSSClient(configWithSTS);
 
 // 使用STS临时令牌上传文件
 await ossWithSTS.putObject(
@@ -275,7 +275,7 @@ class StsTokenManager {
 
 // 使用动态STS令牌刷新初始化客户端
 final stsManager = StsTokenManager();
-final OSSClient ossWithDynamicSTS = OSSClient.init(
+final OSSClient ossWithDynamicSTS = OSSClient(
   OSSConfig(
     accessKeyIdProvider: () => stsManager.accessKeyId,
     accessKeySecretProvider: () => stsManager.accessKeySecret,

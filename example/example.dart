@@ -225,7 +225,7 @@ Future<void> _runSignedUploadExample() async {
 
     // 步骤1: 使用 buildOssUri 构建 OSS URI
     print('\n步骤1: 构建 OSS URI...');
-    final Uri ossUri = OSSClient.instance.buildOssUri(
+    final Uri ossUri = oss.buildOssUri(
       fileKey: ossObjectKey,
       // 可以添加自定义查询参数（如果需要）
       // queryParameters: {'x-oss-process': 'image/resize,l_100'},
@@ -243,7 +243,7 @@ Future<void> _runSignedUploadExample() async {
     // 步骤3: 使用 createSignedHeaders 创建签名 Headers
     print('\n步骤3: 创建签名 Headers...');
     final Map<String, dynamic> signedHeaders =
-        OSSClient.instance.createSignedHeaders(
+        oss.createSignedHeaders(
       method: 'PUT', // 上传使用 PUT 方法
       fileKey: ossObjectKey,
       contentLength: fileSize,
@@ -397,7 +397,7 @@ Future<void> _runSignedDownloadExample() async {
 
     // 步骤1: 使用 buildOssUri 构建 OSS URI
     print('\n步骤1: 构建 OSS URI...');
-    final Uri ossUri = OSSClient.instance.buildOssUri(
+    final Uri ossUri = oss.buildOssUri(
       fileKey: ossObjectKey,
       // 可以添加自定义查询参数（如果需要）
       // queryParameters: {'x-oss-process': 'image/resize,l_100'},
@@ -415,7 +415,7 @@ Future<void> _runSignedDownloadExample() async {
     // 步骤3: 使用 createSignedHeaders 创建签名 Headers
     print('\n步骤3: 创建签名 Headers...');
     final Map<String, dynamic> signedHeaders =
-        OSSClient.instance.createSignedHeaders(
+        oss.createSignedHeaders(
       method: 'GET', // 下载使用 GET 方法
       fileKey: ossObjectKey,
       baseHeaders: baseHeaders,
@@ -934,7 +934,7 @@ Future<void> main() async {
 
   // 方式1：使用静态配置（传统方式）
   print('📋 初始化OSS客户端...');
-  oss = OSSClient.init(
+  oss = OSSClient(
     OSSConfig.static(
       accessKeyId: OssConfig.accessKeyId,
       accessKeySecret: OssConfig.accessKeySecret,
@@ -950,7 +950,7 @@ Future<void> main() async {
   // 取消注释以下代码来使用STS动态刷新功能：
   /*
   final stsManager = StsTokenManager();
-  oss = OSSClient.init(
+  oss = OSSClient(
     OSSConfig(
       accessKeyIdProvider: () => stsManager.accessKeyId,
       accessKeySecretProvider: () => stsManager.accessKeySecret,
@@ -965,7 +965,7 @@ Future<void> main() async {
   // 方式3：使用自定义域名（CNAME）
   // 取消注释以下代码来使用自定义域名：
   /*
-  oss = OSSClient.init(
+  oss = OSSClient(
     OSSConfig.static(
       accessKeyId: OssConfig.accessKeyId,
       accessKeySecret: OssConfig.accessKeySecret,

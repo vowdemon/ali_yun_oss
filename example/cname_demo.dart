@@ -40,8 +40,8 @@ void main() async {
   print('  - CNAME: ${standardConfig.cname}');
   print('  - 完整配置: $standardConfig\n');
 
-  // 初始化客户端（标准域名）
-  final OSSClient standardClient = OSSClient.init(standardConfig);
+  // 创建客户端（标准域名）
+  final OSSClient standardClient = OSSClient(standardConfig);
 
   // 生成标准URL
   final Uri standardUri = standardClient.buildOssUri(fileKey: testFile);
@@ -145,7 +145,7 @@ final config = OSSConfig.static(
   cname: true, // 启用自定义域名
 );
 
-final oss = OSSClient.init(config);
+final oss = OSSClient(config);
 
 // 生成使用自定义域名的URL
 final uri = oss.buildOssUri(fileKey: 'path/to/file.jpg');

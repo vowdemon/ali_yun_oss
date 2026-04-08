@@ -426,7 +426,7 @@ class AliOssV4SignUtils {
 
     // 合并：额外声明的头 ∪ 默认固定头 ∪ 自动收集头
     final Set<String> allSignHeaders = <String>{
-      ...additionalHeaders.map((e) => e.toLowerCase()),
+      ...additionalHeaders.map((String e) => e.toLowerCase()),
       ..._defaultSignHeaders,
       ...autoSignHeaders,
     };
